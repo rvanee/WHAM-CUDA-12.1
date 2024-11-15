@@ -1,0 +1,22 @@
+name: wham
+channels:
+  - pyg
+  - pytorch
+  - nvidia
+  - conda-forge
+  - fvcore
+  - iopath
+  - pytorch3d
+dependencies:
+  - pip
+  - python=3.10
+  - pytorch=2.3.1
+  - pytorch-scatter=2.1.2
+  - pytorch-cuda=12.1
+  - torchvision=0.18
+  - torchaudio=2.3.1
+  - fvcore
+  - iopath
+  - pytorch3d
+  - pip:
+    - -r requirements.txt
