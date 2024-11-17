@@ -11,15 +11,15 @@ import scipy.signal as signal
 from progress.bar import Bar
 
 from ultralytics import YOLO
-from mmpose.apis import (
-    inference_top_down_pose_model,
-    init_pose_model,
-    get_track_id,
-    vis_pose_result,
-)
+#from mmpose.apis import (
+#    inference_top_down_pose_model,
+#    init_pose_model,
+#    get_track_id,
+#    vis_pose_result,
+#)
 
 ROOT_DIR = osp.abspath(f"{__file__}/../../../../")
-VIT_DIR = osp.join(ROOT_DIR, "third-party/ViTPose")
+#VIT_DIR = osp.join(ROOT_DIR, "third-party/ViTPose")
 
 VIS_THRESH = 0.3
 BBOX_CONF = 0.5
@@ -31,13 +31,12 @@ class DetectionModel(object):
     def __init__(self, device):
         
         # ViTPose
-        pose_model_cfg = osp.join(VIT_DIR, 'configs/body/2d_kpt_sview_rgb_img/topdown_heatmap/coco/ViTPose_huge_coco_256x192.py')
-        pose_model_ckpt = osp.join(ROOT_DIR, 'checkpoints', 'vitpose-h-multi-coco.pth')
-        self.pose_model = init_pose_model(pose_model_cfg, pose_model_ckpt, device=device.lower())
+        #pose_model_cfg = osp.join(VIT_DIR, 'configs/body/2d_kpt_sview_rgb_img/topdown_heatmap/coco/ViTPose_huge_coco_256x192.py')
+        #pose_model_ckpt = osp.join(ROOT_DIR, 'checkpoints', 'vitpose-h-multi-coco.pth')
+        #self.pose_model = init_pose_model(pose_model_cfg, pose_model_ckpt, device=device.lower())
         
-        # YOLO
-        bbox_model_ckpt = osp.join(ROOT_DIR, 'checkpoints', 'yolov8x.pt')
-        self.bbox_model = YOLO(bbox_model_ckpt)
+        # YOLO. Note that the model is downloaded automatically the first time it is needed
+        self.yolo_pose_model = YOLO('yolo11n-pose.pt')
         
         self.device = device
         self.initialize_tracking()
@@ -77,31 +76,37 @@ class DetectionModel(object):
         self.tracking_results['bbox'] = bbox
     
     def track(self, img, fps, length):
-        
-        # bbox detection
-        bboxes = self.bbox_model.predict(
-            img, device=self.device, classes=0, conf=BBOX_CONF, save=False, verbose=False
-        )[0].boxes.xyxy.detach().cpu().numpy()
-        bboxes = [{'bbox': bbox} for bbox in bboxes]
-        
+             
+        # YOLO bbox detection and pose estimation
+        yolo_pose_results = self.yolo_pose_model.predict(
+            img, device=self.device, classes=0, conf=BBOX_CONF, save=False, verbose=False)
+        #bboxes = [{'bbox': bbox} for bbox in yolo_pose_results[0].boxes.xyxy.detach().cpu().numpy()]
+        pose_results = [
+            { 'track_id': list(y.names.keys())[0],
+              'bbox': y.boxes.xyxy.detach().cpu().numpy()[0],
+              'keypoints': y.keypoints.data.detach().cpu().numpy()[0] }
+            for y in yolo_pose_results]
+        #print(pose_results)
+         
         # keypoints detection
-        pose_results, returned_outputs = inference_top_down_pose_model(
-            self.pose_model,
-            img,
-            person_results=bboxes,
-            format='xyxy',
-            return_heatmap=False,
-            outputs=None)
+        #pose_results, returned_outputs = inference_top_down_pose_model(
+        #    self.pose_model,
+        #    img,
+        #    person_results=bboxes,
+        #    format='xyxy',
+        #    return_heatmap=False,
+        #    outputs=None)
         
         # person identification
-        pose_results, self.next_id = get_track_id(
-            pose_results,
-            self.pose_results_last,
-            self.next_id,
-            use_oks=False,
-            tracking_thr=TRACKING_THR,
-            use_one_euro=True,
-            fps=fps)
+        #pose_results, self.next_id = get_track_id(
+        #    pose_results,
+        #    self.pose_results_last,
+        #    self.next_id,
+        #    use_oks=False,
+        #    tracking_thr=TRACKING_THR,
+        #    use_one_euro=True,
+        #    fps=fps)
+        #print(f"person identification: {pose_results}")
         
         for pose_result in pose_results:
             n_valid = (pose_result['keypoints'][:, -1] > VIS_THRESH).sum()
